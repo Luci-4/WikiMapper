@@ -87,12 +87,12 @@ class Crawler:
                 if child not in temp_visited:
                     temp_visited.add(child)
                     queue.append('https://en.wikipedia.org/wiki/' + child)
-                    relations.append([self.parent, child, self.jump])
+                    relations.append([self.parent, child])
 
     def live(self, link: str):
         """All functionality here"""
         self.pageLoader(link)
-        self.jump = jump
+        
 
         if self.parent and self.visitChecker():
             self.relate()
@@ -105,7 +105,7 @@ def database():
     cur = con.cursor()
     cur.execute('''Create TABLE IF NOT EXISTS relations
         (Parent text,
-        Child text,
+        Child text
     )''')
 
     for relation in relations:
