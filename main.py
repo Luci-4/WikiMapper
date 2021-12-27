@@ -157,19 +157,19 @@ if __name__ == '__main__':
     print("Processing...")
 
     queenSpider = Crawler()
-    walk(queenSpider, 1)
+    # walk(queenSpider, 1)
 
-    if len(queue) > 40:
-        spiderPopulation = 40 
-    else:
-        spiderPopulation = len(queue)
-
-    for _ in range(spiderPopulation):
-        spiders.append(Crawler())
+    # TODO: fix somehow Multithreading 
+    # if len(queue) > 40:
+    #     spiderPopulation = 40 
+    # else:
+    #     spiderPopulation = len(queue)
+    # for _ in range(spiderPopulation):
+    #     spiders.append(Crawler())
     
-    for spider in spiders:
-        x = threading.Thread(target=walk, args=(spider, depth,))
-        x.start()
+    # for spider in spiders:
+    #     x = threading.Thread(target=walk, args=(spider, depth,))
+    #     x.start()
     walk(queenSpider, depth, True)
 
     while threading.active_count() != 1:
