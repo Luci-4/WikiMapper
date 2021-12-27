@@ -6,16 +6,68 @@ import re
 import sqlite3
 import sys
 import threading
-
-
-firstPage = r'https://en.wikipedia.org/wiki/Wroc%C5%82aw'
+import os
 
 
 relations = []
-queue = [firstPage]
 
-spiderPopulation = 30
-depth = 15
+
+def userInput():
+    global path
+    global firstPage
+    global depth
+    global queue
+
+    while len(path := input('Name:')) == 0:
+        print('Error: Name can\'t be empty!')
+
+    while len(firstPage := input('Link:')) == 0 or not re.search(r'https://en\.wikipedia\.org/wiki/', firstPage):
+        print('Error: Given link is not valid!')
+
+    while not(depth := input('Depth:').isdigit()):
+        print('Error: depth must be integer!')
+
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+    queue = [firstPage]
+
+
+def database():
+    """Save to database"""
+
+    con = sqlite3.connect(os.path.join(path, f'{path}.db'))
+    cur = con.cursor()
+    cur.execute('''Create TABLE IF NOT EXISTS relations
+        (Parent text,
+        Child text
+    )''')
+
+    for relation in relations:
+        cur.execute('insert into relations values (?,?)',
+                    (relation[0], relation[1]))
+
+    con.commit()
+    con.close()
+    print("\nSaved to database")
+
+
+def progressBar(count: int, total: int, status=''):
+    bar_len = 60
+    filled_len = int(round(bar_len * count / float(total)))
+
+    percents = round(100.0 * count / float(total), 1)
+    bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
+    sys.stdout.flush()
+
+
+def walk(spider, thisDepth: int, queen=False):
+    for current in range(thisDepth):
+        spider.live(queue.pop(0))
+        if queen:
+            progressBar(current, thisDepth)
 
 
 class Crawler:
@@ -92,69 +144,36 @@ class Crawler:
     def live(self, link: str):
         """All functionality here"""
         self.pageLoader(link)
-        
 
         if self.parent and self.visitChecker():
             self.relate()
 
 
-def database():
-    """Save to database"""
-
-    con = sqlite3.connect('wikiProject.db')
-    cur = con.cursor()
-    cur.execute('''Create TABLE IF NOT EXISTS relations
-        (Parent text,
-        Child text
-    )''')
-
-    for relation in relations:
-        cur.execute('insert into relations values (?,?)',
-                    (relation[0], relation[1]))
-
-    con.commit()
-    con.close()
-    print("\nSaved to database")
-
-
-def progress(count: int, total: int, status=''):
-    bar_len = 60
-    filled_len = int(round(bar_len * count / float(total)))
-
-    percents = round(100.0 * count / float(total), 1)
-    bar = '=' * filled_len + '-' * (bar_len - filled_len)
-
-    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
-    sys.stdout.flush()
-
-
-def clutter(spider, thisDepth, queen=False):
-    for current in range(thisDepth):
-        spider.live(queue.pop(0))
-        if queen:
-            progress(current, thisDepth)
-
-
 if __name__ == '__main__':
+    userInput()
 
     spiders = []
 
+    print("Processing...")
+
+    queenSpider = Crawler()
+    walk(queenSpider, 1)
+
+    if len(queue) > 40:
+        spiderPopulation = 40 
+    else:
+        spiderPopulation = len(queue)
+
     for _ in range(spiderPopulation):
         spiders.append(Crawler())
-
-    print("Processing...")
-    # TO FIX: DEPENDENCY ON LENGTH OF QUEUE
-    queenSpider = Crawler()
-    clutter(queenSpider, 2)
-
+    
     for spider in spiders:
-        x = threading.Thread(target=clutter, args=(spider, depth,))
+        x = threading.Thread(target=walk, args=(spider, depth,))
         x.start()
-
-    clutter(queenSpider, depth, True)
+    walk(queenSpider, depth, True)
 
     while threading.active_count() != 1:
         sleep(1)
+
     database()
-    print('\nFinished')
-    createGraph()
+    createGraph(path)

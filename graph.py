@@ -1,8 +1,11 @@
 import networkx as nx
+import os
 import sqlite3
 
-def createGraph():
-    con = sqlite3.connect('wikiProject.db')
+mainName = 'JanPaweł'
+
+def createGraph(path):
+    con = sqlite3.connect(os.path.join(path,f'{path}.db'))
 
     nodes = set()
     edges = set()
@@ -21,7 +24,7 @@ def createGraph():
     G.add_edges_from(edges)
     print(G)
 
-    nx.write_gexf(G,'myChild.gexf')
+    nx.write_gexf(G,os.path.join(path,f'{path}.gexf'))
 
 if __name__ == '__main__':
     createGraph()
