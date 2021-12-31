@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
-from time import sleep
 from graph import createGraph
+from time import sleep
 import requests
 import re
 import sqlite3
@@ -17,6 +17,7 @@ def userInput():
     global firstPage
     global depth
     global queue
+    global threads
 
     while len(path := input('Name:')) == 0:
         print('Error: Name can\'t be empty!')
@@ -26,6 +27,13 @@ def userInput():
 
     while not(depth := input('Depth:').isdigit()):
         print('Error: depth must be integer!')
+
+    while (threads := input('Multithreading (yes/no):') not in ('yes', 'no')):
+        print('Error')
+    if threads == 'yes':
+        threads = True
+    else:
+        threads = False
 
     if not os.path.exists(path):
         os.mkdir(path)
@@ -85,7 +93,7 @@ class Crawler:
 
     def formatter(self, OtherLink: str):
         """
-        Cut out article name from link name
+        Cut out article name from link 
         Check if page is interesting one
         """
 
@@ -132,7 +140,7 @@ class Crawler:
 
         temp_visited = set()
         temp_visited.add(self.parent)
-
+        print(len(temp_visited) == 1)
         for a in self.soup.find_all('a', href=True):
 
             if child := self.formatter(a['href']):
@@ -144,7 +152,6 @@ class Crawler:
     def live(self, link: str):
         """All functionality here"""
         self.pageLoader(link)
-
         if self.parent and self.visitChecker():
             self.relate()
 
@@ -153,24 +160,18 @@ if __name__ == '__main__':
     userInput()
 
     spiders = []
-
     print("Processing...")
-
     queenSpider = Crawler()
-    # walk(queenSpider, 1)
+    walk(queenSpider, depth)
+    if threads:
+        for _ in range(len(queue)):
+            spiders.append(Crawler())
 
-    # TODO: fix somehow Multithreading 
-    # if len(queue) > 40:
-    #     spiderPopulation = 40 
-    # else:
-    #     spiderPopulation = len(queue)
-    # for _ in range(spiderPopulation):
-    #     spiders.append(Crawler())
-    
-    # for spider in spiders:
-    #     x = threading.Thread(target=walk, args=(spider, depth,))
-    #     x.start()
-    walk(queenSpider, depth, True)
+        for spider in spiders:
+            x = threading.Thread(target=walk, args=(spider, depth-1,))
+            x.start()
+
+    walk(queenSpider, depth-1, True)
 
     while threading.active_count() != 1:
         sleep(1)
