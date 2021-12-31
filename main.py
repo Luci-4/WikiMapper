@@ -8,76 +8,6 @@ import sys
 import threading
 import os
 
-
-relations = []
-
-
-def userInput():
-    global path
-    global firstPage
-    global depth
-    global queue
-    global threads
-
-    while len(path := input('Name:')) == 0:
-        print('Error: Name can\'t be empty!')
-
-    while len(firstPage := input('Link:')) == 0 or not re.search(r'https://en\.wikipedia\.org/wiki/', firstPage):
-        print('Error: Given link is not valid!')
-
-    while not(depth := input('Depth:').isdigit()):
-        print('Error: depth must be integer!')
-
-    while (threads := input('Multithreading (yes/no):') not in ('yes', 'no')):
-        print('Error')
-    if threads == 'yes':
-        threads = True
-    else:
-        threads = False
-
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    queue = [firstPage]
-
-
-def database():
-    """Save to database"""
-
-    con = sqlite3.connect(os.path.join(path, f'{path}.db'))
-    cur = con.cursor()
-    cur.execute('''Create TABLE IF NOT EXISTS relations
-        (Parent text,
-        Child text
-    )''')
-
-    for relation in relations:
-        cur.execute('insert into relations values (?,?)',
-                    (relation[0], relation[1]))
-
-    con.commit()
-    con.close()
-    print("\nSaved to database")
-
-
-def progressBar(count: int, total: int, status=''):
-    bar_len = 60
-    filled_len = int(round(bar_len * count / float(total)))
-
-    percents = round(100.0 * count / float(total), 1)
-    bar = '=' * filled_len + '-' * (bar_len - filled_len)
-
-    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
-    sys.stdout.flush()
-
-
-def walk(spider, thisDepth: int, queen=False):
-    for current in range(thisDepth):
-        spider.live(queue.pop(0))
-        if queen:
-            progressBar(current, thisDepth)
-
-
 class Crawler:
 
     visited = set()
@@ -135,7 +65,7 @@ class Crawler:
 
         return True
 
-    def relate(self):
+    def relate(self, queue, relations):
         """Create relation between base link and links retrived from site"""
 
         temp_visited = set()
@@ -149,32 +79,99 @@ class Crawler:
                     queue.append('https://en.wikipedia.org/wiki/' + child)
                     relations.append([self.parent, child])
 
-    def live(self, link: str):
+    def live(self, link: str, queue, relations):
         """All functionality here"""
         self.pageLoader(link)
         if self.parent and self.visitChecker():
-            self.relate()
+            self.relate(queue, relations)
 
+class App:
+    relations = []
+        
+    def main(self) -> None: 
+        self.userInput()
+        self.spiders = []
+        print("Processing...")
+        queenSpider = Crawler()
+        self.walk(queenSpider, self.depth)
+        if self.threads:
+            for _ in range(len(self.queue)):
+                self.spiders.append(Crawler())
+
+            for spider in self.spiders:
+                x = threading.Thread(target=self.walk, args=(spider, self.depth-1,))
+                x.start()
+
+        self.walk(queenSpider, self.depth-1, True)
+
+        while threading.active_count() != 1:
+            sleep(1)
+
+        self.database()
+        createGraph(self.path)
+        
+    def userInput(self):
+        while len(path := input('Name:')) == 0:
+            print('Error: Name can\'t be empty!')
+        self.path = path
+
+        while len(firstPage := input('Link:')) == 0 or not re.search(r'https://en\.wikipedia\.org/wiki/', firstPage):
+            print('Error: Given link is not valid!')
+        self.firstPage = firstPage
+
+        while not(depth := input('Depth:').isdigit()):
+            print('Error: depth must be integer!')
+        self.depth = depth
+
+        while (threads := input('Multithreading (yes/no):') not in ('yes', 'no')):
+            print('Error')
+
+        if threads == 'yes':
+            self.threads = True
+        else:
+            self.threads = False
+
+        if not os.path.exists(self.path):
+            os.mkdir(self.path)
+
+        self.queue = [self.firstPage]
+    def database(self):
+        """Save to database"""
+
+        con = sqlite3.connect(os.path.join(self.path, f'{self.path}.db'))
+        cur = con.cursor()
+        cur.execute('''Create TABLE IF NOT EXISTS relations
+            (Parent text,
+            Child text
+        )''')
+
+        for relation in self.relations:
+            cur.execute('insert into relations values (?,?)',
+                        (relation[0], relation[1]))
+
+        con.commit()
+        con.close()
+        print("\nSaved to database")
+
+
+    def progressBar(count: int, total: int, status=''):
+        bar_len = 60
+        filled_len = int(round(bar_len * count / float(total)))
+
+        percents = round(100.0 * count / float(total), 1)
+        bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+        sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
+        sys.stdout.flush()
+
+
+    def walk(self, spider, depth: int, queen=False):
+        for current in range(depth):
+            spider.live(self.queue.pop(0), self.queue, self.relations)
+            if queen:
+                self.progressBar(current, depth)
 
 if __name__ == '__main__':
-    userInput()
+    app = App()
+    app.main()
 
-    spiders = []
-    print("Processing...")
-    queenSpider = Crawler()
-    walk(queenSpider, depth)
-    if threads:
-        for _ in range(len(queue)):
-            spiders.append(Crawler())
-
-        for spider in spiders:
-            x = threading.Thread(target=walk, args=(spider, depth-1,))
-            x.start()
-
-    walk(queenSpider, depth-1, True)
-
-    while threading.active_count() != 1:
-        sleep(1)
-
-    database()
-    createGraph(path)
